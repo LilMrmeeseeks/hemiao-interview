@@ -209,6 +209,28 @@ details.q[open]>.qb{display:block}
   .doc table{min-width:0}
 }
 
+/* ---------- 术语注释 ---------- */
+.gl{border-bottom:1px dashed #B33F0D;cursor:help}
+.gl::after{content:"?";font-size:.58em;vertical-align:super;color:#B33F0D;margin-left:1px;opacity:.7}
+.gl:hover,.gl.on{background:rgba(179,63,13,.09)}
+#glpop{position:absolute;z-index:90;max-width:min(340px,76vw);background:#FFFDF7;border:1px solid #D3CFC3;border-left:3px solid #B33F0D;padding:10px 12px;font-size:13px;line-height:1.65;color:#2B2A26;box-shadow:0 10px 26px rgba(0,0,0,.12);border-radius:3px;display:none}
+#glpop b{display:block;font-size:11.5px;letter-spacing:.08em;color:#B33F0D;margin-bottom:5px}
+/* ---------- 小节标题 / 有序列表 / 术语表 ---------- */
+.doc h3.sub{font-size:17px;line-height:1.55;margin:26px 0 10px;padding-left:10px;border-left:3px solid #B33F0D;font-weight:700;color:#2B2A26;max-width:44em}
+.doc h4.sub{font-size:16px;line-height:1.55;margin:20px 0 8px;font-weight:700;max-width:44em}
+.doc ol{margin:10px 0 14px;padding-left:24px;max-width:44em}
+.doc ol>li{margin:6px 0;line-height:1.75}
+.doc ol>li::marker{color:#B33F0D;font-variant-numeric:tabular-nums}
+.side-link{display:block;margin:12px 18px 0;padding:8px 10px;border:1px dashed #C9C4B7;border-radius:4px;font-size:13px;color:#6E6A61;text-decoration:none;text-align:center}
+.side-link:hover{border-color:#B33F0D;color:#B33F0D;background:#FFFDF7}
+.glist{display:grid;grid-template-columns:158px 1fr;margin:14px 0 10px;border-top:1px solid #DEDAD0}
+.glist dt{font-weight:700;padding:9px 12px 9px 0;border-bottom:1px solid #EDEAE3;font-size:15px;word-break:keep-all}
+.glist dd{margin:0;padding:9px 0;border-bottom:1px solid #EDEAE3;font-size:15px;line-height:1.72;color:#3A3833}
+@media(max-width:640px){
+  .glist{grid-template-columns:1fr}
+  .glist dt{border-bottom:0;padding-bottom:0}
+  .glist dd{padding-top:3px}
+}
 </style>
 </head>
 <body>
