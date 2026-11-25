@@ -976,7 +976,7 @@ Object.values(F).forEach(drawFig);
   var elKnob = bar ? bar.querySelector('.pb-knob') : null;
   var bPlay = document.getElementById('pbPlay');
   var PL = null, idx = 0, auto = true;
-  var dragging = false, wasPlaying = false, lastUserScroll = 0, lastHi = -1;
+  var dragging = false, wasPlaying = false, lastUserScroll = 0, lastHi = -1, lastHitEl = null, progScroll = false, progScrollTm = 0;
 
   var LBL = { question: '题干', answer: '30 秒答', follow: '往下追', avoid: '别说错' };
 
@@ -1036,18 +1036,38 @@ Object.values(F).forEach(drawFig);
     if (name === 'question') hit = host.querySelector('summary');
     if (elSeg) elSeg.textContent = LBL[name] || '';
 
-    // 自动滚：只在播放中、且用户 6 秒内没自己滚过、且目标不在视野里
-    if (!au.paused && hit && Date.now() - lastUserScroll > 6000) {
-      var r = hit.getBoundingClientRect();
-      var vh = window.innerHeight || 800;
-      if (r.top < 72 || r.bottom > vh - 96) {
-        hit.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    // 自动滚：段变了才判断一次；换题时必须跟过去；用户刚自己滚过就先让位
+    var changed = (hit && hit !== lastHitEl);
+    var switched = (num(it) !== lastHi);
+    if (changed || switched) {
+      lastHitEl = hit;
+      var allow = switched || (Date.now() - lastUserScroll > 2500);
+      if (hit && allow && (!au.paused || switched || dragging)) {
+        var r = hit.getBoundingClientRect();
+        var vh = window.innerHeight || 800;
+        if (r.top < 72 || r.bottom > vh - 96) {
+          progScroll = true;
+          var root = document.documentElement;
+          var prevBeh = root.style.scrollBehavior;
+          root.style.scrollBehavior = 'auto';
+          hit.scrollIntoView({ block: 'center' });
+          root.style.scrollBehavior = prevBeh;
+          clearTimeout(progScrollTm);
+          progScrollTm = setTimeout(function () { progScroll = false; }, 900);
+        }
       }
     }
     lastHi = num(it);
   }
 
-  window.addEventListener('scroll', function () { lastUserScroll = Date.now(); }, { passive: true });
+  // 只有「用户主动的滚动手势」才算打断——裸 scroll 事件会把锚点跳转、scrollIntoView
+  // 和页面加载都算成用户滚动，导致跟随被自己的滚动静默掉
+  ['wheel', 'touchmove', 'keydown'].forEach(function (ev) {
+    window.addEventListener(ev, function (e) {
+      if (ev === 'keydown' && !/^(Arrow|Page|Home|End| |Spacebar)$/.test(e.key || '')) return;
+      lastUserScroll = Date.now();
+    }, { passive: true });
+  });
 
   /* ---------- 播放条 ---------- */
   function paint() {
@@ -1096,6 +1116,7 @@ Object.values(F).forEach(drawFig);
     bar.hidden = false;
     document.body.classList.add('hasbar');
     lastHi = -1;
+    lastHitEl = null;
     paint();
     return true;
   }
