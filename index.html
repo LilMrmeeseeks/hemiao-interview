@@ -310,7 +310,8 @@ details.q>summary .qplay{order:9}
 .doc details.q[data-act="1"]>summary{background:#FFF4E9;box-shadow:inset 3px 0 0 #B33F0D}
 .doc details.q[data-act="1"]>summary .qt{color:#B33F0D}
 
-.doc .seg{padding:2px 8px 2px 10px;margin:2px 0 2px -10px;border-radius:6px;transition:background .18s ease,box-shadow .18s ease}
+.doc .seg{padding:2px 8px 2px 10px;margin:2px 0 2px -10px;border-radius:6px;cursor:pointer;transition:background .18s ease,box-shadow .18s ease}
+.doc .seg:hover{background:#FAF6EE}
 .doc .seg.on{background:#FFF4E9;box-shadow:inset 3px 0 0 #B33F0D}
 .doc .seg .p,.doc .seg p{margin-top:2px}
 .doc summary .qt.on{color:#B33F0D}
@@ -1157,6 +1158,30 @@ Object.values(F).forEach(drawFig);
       var i = qIndex(qn);
       if (i >= 0) { go(i, 1); }
     }).catch(function () { toast('音频清单没载入，检查网络后再试'); });
+  });
+
+  // 点某一段的文字 = 从这一段开始播
+  document.addEventListener('click', function (e) {
+    var tg = e.target;
+    if (tg && tg.closest && (tg.closest('.gl') || tg.closest('a'))) return;
+    var s = tg && tg.closest ? tg.closest('.seg') : null;
+    if (!s) return;
+    var au2 = au;
+    if (!PL) return;
+    var host2 = s.closest('details.q');
+    if (!host2) return;
+    var qn3 = Number(String(host2.id).replace(/\D+/g, ''));
+    var i2 = qIndex(qn3);
+    if (i2 < 0) return;
+    var nm = s.getAttribute('data-seg');
+    var it2 = PL.items[i2], si2 = -1;
+    for (var k2 = 0; k2 < it2.segs.length; k2++) { if (it2.segs[k2].name === nm) si2 = k2; }
+    if (si2 < 0) return;
+    lastUserScroll = Date.now();
+    if (i2 !== idx) { go(i2, si2); return; }
+    try { au2.currentTime = it2.segs[si2].t; } catch (er) { }
+    paint();
+    if (au2.paused) au2.play().catch(function () { toast('再点一下播放键就开始了'); });
   });
 
   ['listenAll', 'listenAllChip'].forEach(function (id) {
