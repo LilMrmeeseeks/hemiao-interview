@@ -1100,53 +1100,42 @@ Object.values(F).forEach(drawFig);
     return 2 * hit / (a.length + b.length - 2);
   }
 
-  /* 用句级字幕给每个色块算出真实起止时间，替代"整段按字数均分"的估算 */
+  /* 逐块时间 = 按「朗读字数」把该段字幕句映射到页面色块上：
+     每个字幕句是真实的时间锚点（句首/句末都对齐），句内再按字数分配。
+     比整段按页面字数均分准得多，且不依赖文本相似度匹配。 */
   function buildPlan(segEl, cues) {
     if (segEl.__plan) return segEl.__plan;
-    var us = segEl.querySelectorAll('.u'), blocks = [], i;
+    var us = segEl.querySelectorAll('.u'), blocks = [], i, total = 0;
     for (i = 0; i < us.length; i++) {
-      if (us[i].classList.contains('ghost')) continue; // 占位块不参与字幕匹配
-      blocks.push({ el: us[i], txt: nrm(us[i].textContent), len: Number(us[i].getAttribute('data-len')) || 1 });
+      if (us[i].classList.contains('ghost')) continue;
+      var L = Number(us[i].getAttribute('data-len')) || (us[i].textContent || '').length || 1;
+      blocks.push({ el: us[i], len: L });
+      total += L;
     }
-    var plan = [], bi = 0, j, k, q;
-    for (j = 0; j < cues.length; j++) {
-      var c = cues[j], ct = nrm(c.txt), c0 = c.t, c1 = c.t + c.d;
-      if (!ct) continue;
-      var bestK = 0, bestScore = 0;
-      for (k = 1; k <= 5 && bi + k <= blocks.length; k++) {
-        var comb = '';
-        for (q = 0; q < k; q++) comb += blocks[bi + q].txt;
-        var sc = dice(comb, ct);
-        // 长度差太多就压低分，避免"只盖住半句"也拿高分
-        var mx = Math.max(comb.length, ct.length) || 1;
-        sc *= 1 - Math.min(0.45, Math.abs(comb.length - ct.length) / mx * 0.55);
-        if (sc > bestScore) { bestScore = sc; bestK = k; }
-        if (comb.length >= ct.length * 1.35) break;
-      }
-      if (bestScore >= 0.34 && bestK > 0) {
-        var tot = 0;
-        for (q = 0; q < bestK; q++) tot += blocks[bi + q].len;
-        var acc = 0;
-        for (q = 0; q < bestK; q++) {
-          var L = blocks[bi + q].len;
-          plan.push({
-            el: blocks[bi + q].el,
-            s: c0 + (c1 - c0) * acc / tot,
-            e: c0 + (c1 - c0) * (acc + L) / tot
-          });
-          acc += L;
-        }
-        bi += bestK;
-      }
-      // 匹配不上的 cue（例如"这里有一张表，看屏幕"）只消耗时间，不给块
+    var plan = [];
+    if (!blocks.length || !cues || !cues.length || !total) { segEl.__plan = plan; return plan; }
+    var cs = [], spoken = 0;
+    for (i = 0; i < cues.length; i++) {
+      var n = nrm(cues[i].txt).length || 1;
+      spoken += n;
+      cs.push(spoken);
     }
-    if (bi < blocks.length && plan.length) {
-      var last = plan[plan.length - 1];
-      var end = cues.length ? (cues[cues.length - 1].t + cues[cues.length - 1].d) : last.e;
-      for (; bi < blocks.length; bi++) {
-        blocks[bi].el.setAttribute('data-len', blocks[bi].len);
-        plan.push({ el: blocks[bi].el, s: last.e, e: Math.max(last.e + 0.15, end) });
-      }
+    function timeAt(p) {
+      var target = p * spoken, j = 0, prev, frac;
+      while (j < cs.length - 1 && cs[j] < target) j++;
+      prev = j ? cs[j - 1] : 0;
+      frac = cs[j] > prev ? (target - prev) / (cs[j] - prev) : 0;
+      if (frac < 0) frac = 0;
+      if (frac > 1) frac = 1;
+      return cues[j].t + cues[j].d * frac;
+    }
+    var acc = 0;
+    for (i = 0; i < blocks.length; i++) {
+      var L2 = blocks[i].len;
+      var s = timeAt(acc / total), e = timeAt((acc + L2) / total);
+      if (!(e > s)) e = s + 0.05;
+      plan.push({ el: blocks[i].el, s: s, e: e });
+      acc += L2;
     }
     segEl.__plan = plan;
     return plan;
