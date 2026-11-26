@@ -323,6 +323,11 @@ details.q>summary .qplay{order:9}
 .pbar:hover .pb-knob,.pbar.playing .pb-knob,.pbar.drag .pb-knob{opacity:1}
 .pbar.drag .pb-knob{transform:scale(1.2)}
 .pb-prog:focus-visible{outline:2px solid #E4681F;outline-offset:3px}
+.doc .u{transition:background .16s ease,color .16s ease;border-radius:3px}
+.doc .u.read{background:#FBE3C6;color:#8A3009}
+.doc .u.cur{background:#F7C892;color:#5C1D02;box-shadow:0 0 0 1px rgba(179,63,13,.28)}
+.doc .seg.on{background:transparent;box-shadow:inset 4px 0 0 #B33F0D}
+
 </style>
 </head>
 <body id="top">
@@ -1016,6 +1021,80 @@ Object.values(F).forEach(drawFig);
   }
   function hostOf(it) { return document.getElementById('q' + num(it)); }
 
+  /* ---------- 逐句跟随：把段落切成句子单元，按段内时间比例涂色 ---------- */
+  function splitFine(txt) {
+    var out = [];
+    var rough = txt.match(/[^，。！？；：、]*[，。！？；：、]?/g) || [];
+    for (var i = 0; i < rough.length; i++) {
+      var s = rough[i];
+      if (!s) continue;
+      // 太长的片段再按 14 字硬切，保证每块停留 1.5 秒左右
+      while (s.length > 18) { out.push(s.slice(0, 14)); s = s.slice(14); }
+      if (s) out.push(s);
+    }
+    return out;
+  }
+
+  function wrapSentences(node) {
+    var txt = node.nodeValue || '';
+    if (txt.replace(/\s/g, '').length < 10) return;
+    var parts = splitFine(txt);
+    if (!parts || parts.length < 2) return;
+    var frag = document.createDocumentFragment();
+    for (var i = 0; i < parts.length; i++) {
+      var s = parts[i];
+      if (!s) continue;
+      var sp = document.createElement('span');
+      sp.className = 'u';
+      sp.setAttribute('data-len', String(s.replace(/\s/g, '').length));
+      sp.textContent = s;
+      frag.appendChild(sp);
+    }
+    node.parentNode.replaceChild(frag, node);
+  }
+
+  function unitize(host) {
+    if (!host || host.getAttribute('data-un') === '1') return;
+    host.setAttribute('data-un', '1');
+    var segs = host.querySelectorAll('.seg');
+    for (var s = 0; s < segs.length; s++) {
+      var seg = segs[s];
+      var walker = document.createTreeWalker(seg, NodeFilter.SHOW_TEXT, null, false);
+      var nodes = [], n;
+      while ((n = walker.nextNode())) {
+        var par = n.parentNode;
+        if (!par) continue;
+        if (par.closest('.gl, pre, code, svg, summary')) continue;
+        if ((n.nodeValue || '').trim().length < 10) continue;
+        nodes.push(n);
+      }
+      for (var k = 0; k < nodes.length; k++) wrapSentences(nodes[k]);
+      var total = 0, us = seg.querySelectorAll('.u');
+      for (var u = 0; u < us.length; u++) total += Number(us[u].getAttribute('data-len')) || 0;
+      seg.setAttribute('data-total', String(total));
+    }
+  }
+
+  function paintUnits(segEl, now, t0, t1) {
+    if (!segEl || !segEl.classList || !segEl.classList.contains('seg')) return;
+    var total = Number(segEl.getAttribute('data-total')) || 0;
+    if (!total) return;
+    var span = t1 - t0;
+    if (!(span > 0.3)) return;
+    var p = (now - t0) / span;
+    p = p < 0 ? 0 : (p > 1 ? 1 : p);
+    var target = p * total;
+    var acc = 0, curSet = false, us = segEl.querySelectorAll('.u');
+    for (var i = 0; i < us.length; i++) {
+      var len = Number(us[i].getAttribute('data-len')) || 0;
+      var on = (acc + len) <= target;
+      acc += len;
+      if (us[i].classList.contains('read') !== on) us[i].classList.toggle('read', on);
+      var cur = !on && !curSet;
+      if (cur) curSet = true;
+      if (us[i].classList.contains('cur') !== cur) us[i].classList.toggle('cur', cur);
+    }
+  }
   function highlight() {
     var it = PL.items[idx];
     if (!it) return;
@@ -1035,6 +1114,17 @@ Object.values(F).forEach(drawFig);
     host.setAttribute('data-act', name === 'question' ? '1' : '0');
     if (name === 'question') hit = host.querySelector('summary');
     if (elSeg) elSeg.textContent = LBL[name] || '';
+
+    // 逐句涂色
+    if (hit && sg && it.segs) {
+      unitize(host);
+      var si = it.segs.indexOf(sg);
+      if (si >= 0) {
+        var t0 = sg.t || 0;
+        var t1 = it.segs[si + 1] ? it.segs[si + 1].t : (it.dur || au.duration || 0);
+        paintUnits(hit, au.currentTime || 0, t0, t1);
+      }
+    }
 
     // 自动滚：段变了才判断一次；换题时必须跟过去；用户刚自己滚过就先让位
     var changed = (hit && hit !== lastHitEl);
